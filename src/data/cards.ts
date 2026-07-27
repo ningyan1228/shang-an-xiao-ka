@@ -25,5 +25,6 @@ const items: Array<Omit<KnowledgeCard, 'id'>> = [
   {question:'京杭大运河沟通了哪五大水系？',answer:'海河、黄河、淮河、长江、钱塘江。',explanation:'京杭大运河是世界上里程最长、工程最大的古代运河之一。',mnemonic:'海黄淮长钱，运河一线牵。',category:'地理',topic:'中国地理',tags:['运河','水系'],difficulty:2},
   {question:'“青花瓷”主要以哪种颜色为装饰？',answer:'蓝色。',explanation:'青花瓷以钴料着色，在白瓷上绘制纹样，经高温烧成呈蓝色。',mnemonic:'白地蓝花青花瓷。',category:'趣味',topic:'文化常识',tags:['瓷器','艺术'],difficulty:1}
 ];
-export const cards: KnowledgeCard[] = items.map((item, index) => ({ ...item, id: `card-${index + 1}` }));
+export let cards: KnowledgeCard[] = items.map((item, index) => ({ ...item, id: `card-${index + 1}` }));
+export function replaceCards(nextCards: KnowledgeCard[]) { if (nextCards.length) cards = nextCards; }
 export const categories = ['全部','法律','历史','人文','科技','地理','经济','政治','趣味'] as const;

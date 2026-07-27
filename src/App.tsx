@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { HashRouter, Link, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Download, Heart, RotateCcw, Search, Settings2, Star, Upload, X } from 'lucide-react';
-import { cards, categories } from './data/cards';
+import { cards, categories, replaceCards } from './data/cards';
 import { CardArt } from './components/CardArt';
 import { EmptyState } from './components/EmptyState';
 import { Page } from './components/Layout';
@@ -10,6 +10,12 @@ import { dayKey, formatDate } from './lib/date';
 import { clearAll, exportData, importData, loadRecords, loadSessions, loadSettings, saveRecords, saveSessions, saveSettings } from './lib/storage';
 import type { Category, KnowledgeCard } from './types/knowledge';
 import type { Rating, ReviewRecord, StudySession, UserSettings } from './types/review';
+import { AuthForm, AccountPage } from './features/auth/AuthPages';
+import { useAuth } from './features/auth/useAuth';
+import { AdminGuard, AdminHome, ImportPage, PlaceholderAdmin, StoragePage, UsagePage } from './features/admin/AdminPages';
+import { fetchAllPublishedCards } from './features/cards/cardRepository';
+import { mergeLocalData } from './features/progress/progressRepository';
+import { isSupabaseConfigured } from './lib/supabase/client';
 
 function useStore() { const [records,setRecords] = useState<Record<string,ReviewRecord>>(() => loadRecords()); const [settings,setSettings] = useState<UserSettings>(() => loadSettings()); const [sessions,setSessions] = useState<StudySession[]>(() => loadSessions()); useEffect(()=>saveRecords(records),[records]); useEffect(()=>saveSettings(settings),[settings]); useEffect(()=>saveSessions(sessions),[sessions]); return {records,setRecords,settings,setSettings,sessions,setSessions}; }
 function useCardRecord(records: Record<string,ReviewRecord>, id: string) { return records[id] ?? blankRecord(id); }
@@ -39,5 +45,6 @@ function Settings({store}:{store:ReturnType<typeof useStore>}) { const {settings
 function Setting({label,hint,children}:{label:string;hint:string;children:React.ReactNode}) { return <div className="setting"><div><h2>{label}</h2><p>{hint}</p></div><div className="setting-controls">{children}</div></div>; }
 function Toggle({on,set}:{on:boolean;set:(v:boolean)=>void}) { return <button className={`toggle ${on?'on':''}`} onClick={()=>set(!on)} aria-label="切换设置"><i/></button>; }
 function NotFound(){return <Page><EmptyState title="这页找不到了" description="回到首页继续学习吧。" to="/" action="返回首页"/></Page>}
-function AppRoutes(){const store=useStore(); return <Routes><Route path="/" element={<Home store={store}/>}/><Route path="/study" element={<Study store={store}/>}/><Route path="/library" element={<Library store={store}/>}/><Route path="/card/:id" element={<Detail store={store}/>}/><Route path="/mistakes" element={<Mistakes store={store}/>}/><Route path="/favorites" element={<Favorites store={store}/>}/><Route path="/stats" element={<Stats store={store}/>}/><Route path="/settings" element={<Settings store={store}/>}/><Route path="*" element={<NotFound/>}/></Routes>}
+function AdminRoute({auth,children}:{auth:ReturnType<typeof useAuth>;children:React.ReactNode}){return <Page><AdminGuard isAdmin={auth.isAdmin}>{children}</AdminGuard></Page>}
+function AppRoutes(){const store=useStore();const auth=useAuth();const [,setCardVersion]=useState(0);useEffect(()=>{if(!isSupabaseConfigured)return;fetchAllPublishedCards(50).then(remote=>{if(remote.length){replaceCards(remote);setCardVersion(version=>version+1);}}).catch(()=>undefined);},[]);const merge=async()=>{if(!auth.user)throw new Error('请先登录。');const remote=await fetchAllPublishedCards(50);await mergeLocalData(auth.user.id,remote);};return <><div className={`cloud-mode ${isSupabaseConfigured?'':'local'}`}>{isSupabaseConfigured?(auth.user?'云端同步已连接':'游客模式：登录后可跨设备同步'):'本地演示模式：配置 Supabase 后可启用云端同步'}</div><Routes><Route path="/" element={<Home store={store}/>}/><Route path="/study" element={<Study store={store}/>}/><Route path="/library" element={<Library store={store}/>}/><Route path="/card/:id" element={<Detail store={store}/>}/><Route path="/mistakes" element={<Mistakes store={store}/>}/><Route path="/favorites" element={<Favorites store={store}/>}/><Route path="/stats" element={<Stats store={store}/>}/><Route path="/settings" element={<Settings store={store}/>}/><Route path="/login" element={<AuthForm mode="login"/>}/><Route path="/register" element={<AuthForm mode="register"/>}/><Route path="/account" element={<AccountPage user={auth.user} role={auth.role} onMerge={merge}/>}/><Route path="/admin" element={<AdminRoute auth={auth}><AdminHome/></AdminRoute>}/><Route path="/admin/cards" element={<AdminRoute auth={auth}><PlaceholderAdmin title="知识点管理"/></AdminRoute>}/><Route path="/admin/cards/new" element={<AdminRoute auth={auth}><PlaceholderAdmin title="新建知识点"/></AdminRoute>}/><Route path="/admin/cards/:id/edit" element={<AdminRoute auth={auth}><PlaceholderAdmin title="编辑知识点"/></AdminRoute>}/><Route path="/admin/topics" element={<AdminRoute auth={auth}><PlaceholderAdmin title="专题管理"/></AdminRoute>}/><Route path="/admin/import" element={<AdminRoute auth={auth}><ImportPage/></AdminRoute>}/><Route path="/admin/storage" element={<AdminRoute auth={auth}><StoragePage/></AdminRoute>}/><Route path="/admin/usage-guide" element={<AdminRoute auth={auth}><UsagePage/></AdminRoute>}/><Route path="*" element={<NotFound/>}/></Routes></>}
 export default function App(){return <HashRouter><AppRoutes/></HashRouter>}

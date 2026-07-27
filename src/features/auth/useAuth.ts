@@ -1,0 +1,4 @@
+import { useEffect,useState } from 'react';
+import type { User } from '@supabase/supabase-js';
+import { supabase } from '../../lib/supabase/client';
+export function useAuth(){const [user,setUser]=useState<User|null>(null);const [role,setRole]=useState<'user'|'admin'|null>(null);const [ready,setReady]=useState(!supabase);useEffect(()=>{const client=supabase;if(!client)return;client.auth.getUser().then(async({data})=>{setUser(data.user);if(data.user){const db:any=client;const p=await db.from('profiles').select('role').eq('id',data.user.id).maybeSingle();setRole(p.data?.role??'user');}setReady(true);});const {data:{subscription}}=client.auth.onAuthStateChange((_event,session)=>{setUser(session?.user??null);if(!session)setRole(null);});return()=>subscription.unsubscribe();},[]);return{user,role,isAdmin:role==='admin',ready,configured:Boolean(supabase)};}

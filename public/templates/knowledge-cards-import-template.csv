@@ -1,0 +1,2 @@
+category_slug,topic_slug,slug,status,question_type,question,option_a,option_b,option_c,option_d,correct_option,answer,explanation,mnemonic,mistake_tip,difficulty,is_free,sort_order,question_image_filename,answer_image_filename
+science,space,dongfanghong-1,published,choice,我国第一颗人造地球卫星叫什么？,风云一号,东方红一号,嫦娥一号,神舟一号,B,东方红一号,1970年4月24日我国成功发射东方红一号。,,嫦娥一号是月球探测卫星。 ,1,true,1,dongfanghong-1-question.png,dongfanghong-1-answer.png
