@@ -20,6 +20,7 @@ export function AdminHome() {
     <div className="beginner-steps">
       <Link to="/admin/topics"><span>第 1 步</span><b>先建立一个专题</b><small>例如：航天常识、法律基础、唐诗宋词。</small></Link>
       <Link to="/admin/cards/new"><span>第 2 步</span><b>添加一道题</b><small>题目、答案和漫画都在同一页完成，不用填写 slug。</small></Link>
+      <Link to="/admin/cards"><span>已添加题目要修改？</span><b>进入题目管理</b><small>可以修改题干、答案、选项、上下架状态和漫画。</small></Link>
     </div>
     <details className="admin-advanced">
       <summary>已有题库或需要维护？打开高级工具</summary>

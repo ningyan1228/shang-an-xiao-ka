@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { prepareCardImages } from '../../lib/images/compressImage';
 import { supabaseErrorMessage } from '../../lib/supabase/errors';
 import { bindCardImages, getAdminTopics, saveCard, type AdminTopic, type CardInput, type OptionKey, uploadCardImage } from './adminRepository';
@@ -15,12 +15,14 @@ function emptyCard(topicId = ''): CardInput {
 }
 
 export function QuickCardPage() {
+  const navigate = useNavigate();
   const [topics, setTopics] = useState<AdminTopic[]>([]);
   const [form, setForm] = useState<CardInput>(emptyCard());
   const [questionImage, setQuestionImage] = useState<File>();
   const [answerImage, setAnswerImage] = useState<File>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [savedCardId, setSavedCardId] = useState<string>();
 
   useEffect(() => {
     getAdminTopics().then(list => {
@@ -44,9 +46,10 @@ export function QuickCardPage() {
     event.preventDefault();
     setBusy(true);
     setMessage('');
+    setSavedCardId(undefined);
     try {
       if (form.question_type === 'multiple' && !form.correct_options.length) throw new Error('多选题请至少勾选一个正确选项。');
-      await saveCard(form);
+      const savedId = await saveCard(form);
       let imageMessage = '你可以下一题再添加漫画。';
       if (questionImage || answerImage) {
         try {
@@ -60,6 +63,7 @@ export function QuickCardPage() {
         }
       }
       setMessage(`已保存并发布这道题。${imageMessage}`);
+      setSavedCardId(savedId);
       setQuestionImage(undefined);
       setAnswerImage(undefined);
       setForm(emptyCard(topics[0]?.id ?? ''));
@@ -89,6 +93,7 @@ export function QuickCardPage() {
       <details className="admin-advanced"><summary>更多设置（不填也可以）</summary><div className="form-grid"><label>难度<select value={form.difficulty} onChange={event => set('difficulty', Number(event.target.value) as 1 | 2 | 3)}><option value={1}>简单</option><option value={2}>中等</option><option value={3}>困难</option></select></label><label>是否免费<select value={String(form.is_free)} onChange={event => set('is_free', event.target.value === 'true')}><option value="true">免费</option><option value="false">会员内容</option></select></label><label>记忆口诀<input value={form.mnemonic ?? ''} onChange={event => set('mnemonic', event.target.value || null)} /></label><label>易错提醒<input value={form.mistake_tip ?? ''} onChange={event => set('mistake_tip', event.target.value || null)} /></label></div></details>
       <button className="btn primary" disabled={busy || !topics.length}>{busy ? '正在保存和上传…' : '保存并发布这道题'}</button>
       {message && <p className="form-message">{message}</p>}
+      {savedCardId && <div className="actions quick-card-actions"><button type="button" className="btn ghost" onClick={() => navigate(`/admin/cards/${savedCardId}/edit`)}>修改刚添加的题目</button><Link className="btn ghost" to="/admin/cards">查看全部已添加题目</Link></div>}
     </form>
   </section>;
 }
