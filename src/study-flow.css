@@ -1,0 +1,15 @@
+.study-step{margin:15px 0 -4px;color:#4c8054;font-size:14px;font-weight:700}
+.learn-panel{margin-top:18px}
+.study-actions{max-width:550px;margin:18px auto 4px;justify-content:center}
+.study-quiz{max-width:650px;margin:20px auto 0;text-align:left}
+.study-result-art{max-width:620px;margin:0 auto 14px}
+.study-result-art .card-art{width:100%;height:300px}
+.study-result-art .card-art.has-image img{object-fit:contain;object-position:center;background:#f6eedc}
+.study-result-art small{display:block;color:#897b69;font-size:12px;margin-top:7px}
+.detail-preview{margin:18px 0;padding:22px 26px;border:1px solid #e4d6c2;border-radius:14px;background:#f7f0e3}
+.detail-preview h2{margin:0 0 6px;font-size:21px}
+.detail-preview p:not(.eyebrow){margin:0;color:#71675c}
+.detail-preview span{display:inline-block;margin-top:10px;color:#4b8053;font-size:13px;font-weight:700}
+html[data-theme="dark"] .learn-panel,html[data-theme="dark"] .detail-preview{background:#1a2b22;border-color:#4a6652}
+html[data-theme="dark"] .detail-preview p:not(.eyebrow),html[data-theme="dark"] .study-result-art small{color:#c9d4c5}
+@media(max-width:850px){.study-step{font-size:13px;margin:11px 0 -2px}.learn-panel{margin-top:14px}.study-actions{margin-top:14px}.study-quiz{margin-top:15px}.study-result-art .card-art{height:230px}.detail-preview{padding:18px}.detail-preview h2{font-size:19px}}
