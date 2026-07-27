@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { prepareCardImages } from '../../lib/images/compressImage';
+import { supabaseErrorMessage } from '../../lib/supabase/errors';
 import { bindCardImages, getAdminTopics, saveCard, type AdminTopic, type CardInput, uploadCardImage } from './adminRepository';
 
 function createSlug() { return `card-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
@@ -44,16 +45,24 @@ export function QuickCardPage() {
     setMessage('');
     try {
       await saveCard(form);
-      const warnings = await Promise.all([
-        questionImage ? uploadImage('question', questionImage, form.slug) : undefined,
-        answerImage ? uploadImage('answer', answerImage, form.slug) : undefined
-      ]);
-      setMessage(`已保存并发布这道题。${questionImage || answerImage ? '漫画也已自动压缩并绑定。' : '你可以下一题再添加漫画。'}${warnings.filter(Boolean).join(' ')}`);
+      let imageMessage = '你可以下一题再添加漫画。';
+      if (questionImage || answerImage) {
+        try {
+          const warnings = await Promise.all([
+            questionImage ? uploadImage('question', questionImage, form.slug) : undefined,
+            answerImage ? uploadImage('answer', answerImage, form.slug) : undefined
+          ]);
+          imageMessage = `漫画也已自动压缩并绑定。${warnings.filter(Boolean).join(' ')}`;
+        } catch (error) {
+          imageMessage = `题目已保存，但漫画上传失败：${supabaseErrorMessage(error)}。可稍后到“知识点管理”编辑这道题后重传。`;
+        }
+      }
+      setMessage(`已保存并发布这道题。${imageMessage}`);
       setQuestionImage(undefined);
       setAnswerImage(undefined);
       setForm(emptyCard(topics[0]?.id ?? ''));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : '保存失败，请检查必填内容。');
+      setMessage(supabaseErrorMessage(error));
     } finally {
       setBusy(false);
     }
