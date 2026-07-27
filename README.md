@@ -56,7 +56,7 @@ where id = (select id from auth.users where email = '你的管理员邮箱');
 ### 题库与漫画批量导入
 
 - 下载/使用 `public/templates/knowledge-cards-import-template.csv`，在管理员后台 `#/admin/import` 上传；一次最多 50 条。
-- 漫画文件使用 `<card-slug>-question.png` 和 `<card-slug>-answer.png` 命名，在 `#/admin/storage` 批量选择。浏览器会压缩成 WebP、生成缩略图；单图原始文件超过 1 MB 会被阻止。
+- 漫画文件使用 `<card-slug>-question.png` 和 `<card-slug>-answer.png` 命名，在 `#/admin/storage` 批量选择。浏览器会压缩成接近 100 KB 的 WebP、生成缩略图；单图原始文件超过 2 MB 会被阻止。
 - Storage 中只保存压缩图。请保留原始漫画、本地 CSV 和导出文件。
 
 ### 免费额度与故障处理

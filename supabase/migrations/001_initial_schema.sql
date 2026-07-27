@@ -18,9 +18,9 @@ create table if not exists public.topics (
 create table if not exists public.knowledge_cards (
   id uuid primary key default gen_random_uuid(), topic_id uuid not null references public.topics(id) on delete cascade,
   slug text not null unique, status text not null default 'draft' check (status in ('draft','published','archived')),
-  question_type text not null default 'choice' check (question_type in ('choice','recall')), question text not null, answer text not null, explanation text not null,
+  question_type text not null default 'choice' check (question_type in ('choice','multiple','recall')), question text not null, answer text not null, explanation text not null,
   mnemonic text, mistake_tip text, related_knowledge jsonb not null default '[]'::jsonb,
-  option_a text, option_b text, option_c text, option_d text, correct_option text check (correct_option in ('A','B','C','D') or correct_option is null),
+  option_a text, option_b text, option_c text, option_d text, option_e text, correct_option text check (correct_option in ('A','B','C','D','E') or correct_option is null), correct_options text[] not null default '{}',
   question_image_path text, answer_image_path text, question_thumbnail_path text, answer_thumbnail_path text, image_alt text,
   difficulty smallint not null default 1 check (difficulty in (1,2,3)), is_free boolean not null default true, sort_order integer not null default 0,
   published_at timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()

@@ -2,14 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { prepareCardImages } from '../../lib/images/compressImage';
 import { supabaseErrorMessage } from '../../lib/supabase/errors';
-import { bindCardImages, getAdminTopics, saveCard, type AdminTopic, type CardInput, uploadCardImage } from './adminRepository';
+import { bindCardImages, getAdminTopics, saveCard, type AdminTopic, type CardInput, type OptionKey, uploadCardImage } from './adminRepository';
 
 function createSlug() { return `card-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`; }
 
 function emptyCard(topicId = ''): CardInput {
   return {
     topic_id: topicId, slug: createSlug(), status: 'published', question_type: 'choice', question: '', answer: '', explanation: '',
-    option_a: '', option_b: '', option_c: '', option_d: '', correct_option: 'A', difficulty: 1, is_free: true, sort_order: 0,
+    option_a: '', option_b: '', option_c: '', option_d: '', option_e: '', correct_option: 'A', correct_options: ['A'], difficulty: 1, is_free: true, sort_order: 0,
     mnemonic: null, mistake_tip: null, image_alt: null
   };
 }
@@ -30,6 +30,7 @@ export function QuickCardPage() {
   }, []);
 
   const set = <K extends keyof CardInput>(key: K, value: CardInput[K]) => setForm(current => ({ ...current, [key]: value }));
+  const toggleCorrectOption = (key: OptionKey) => setForm(current => ({ ...current, correct_options: current.correct_options.includes(key) ? current.correct_options.filter(item => item !== key) : [...current.correct_options, key] }));
   const uploadImage = async (kind: 'question' | 'answer', file: File, slug: string) => {
     const images = await prepareCardImages(file);
     const base = `cards/${slug}/${kind}-${Date.now()}`;
@@ -44,6 +45,7 @@ export function QuickCardPage() {
     setBusy(true);
     setMessage('');
     try {
+      if (form.question_type === 'multiple' && !form.correct_options.length) throw new Error('多选题请至少勾选一个正确选项。');
       await saveCard(form);
       let imageMessage = '你可以下一题再添加漫画。';
       if (questionImage || answerImage) {
@@ -77,10 +79,10 @@ export function QuickCardPage() {
     <form className="admin-form" onSubmit={submit}>
       <div className="form-grid">
         <label>这道题属于哪个专题？<select value={form.topic_id} onChange={event => set('topic_id', event.target.value)} required disabled={!topics.length}><option value="">请选择专题</option>{topics.map(topic => <option key={topic.id} value={topic.id}>{topic.category_name} · {topic.name}</option>)}</select></label>
-        <label>题型<select value={form.question_type} onChange={event => set('question_type', event.target.value as CardInput['question_type'])}><option value="choice">选择题</option><option value="recall">问答题</option></select></label>
+        <label>题型<select value={form.question_type} onChange={event => { const question_type = event.target.value as CardInput['question_type']; setForm(current => ({ ...current, question_type, correct_option: question_type === 'choice' ? current.correct_option ?? 'A' : null, correct_options: question_type === 'multiple' ? current.correct_options.length ? current.correct_options : ['A'] : question_type === 'choice' ? [current.correct_option ?? 'A'] : [] })); }}><option value="choice">单选题</option><option value="multiple">多选题（可选 1-5 个正确答案）</option><option value="recall">问答题</option></select></label>
       </div>
       <label>题目<textarea value={form.question} onChange={event => set('question', event.target.value)} placeholder="例如：我国第一颗人造地球卫星叫什么？" required /></label>
-      {form.question_type === 'choice' && <div className="form-grid"><label>选项 A<input value={form.option_a ?? ''} onChange={event => set('option_a', event.target.value)} required /></label><label>选项 B<input value={form.option_b ?? ''} onChange={event => set('option_b', event.target.value)} required /></label><label>选项 C<input value={form.option_c ?? ''} onChange={event => set('option_c', event.target.value)} required /></label><label>选项 D<input value={form.option_d ?? ''} onChange={event => set('option_d', event.target.value)} required /></label><label>正确选项<select value={form.correct_option ?? 'A'} onChange={event => set('correct_option', event.target.value as 'A' | 'B' | 'C' | 'D')}><option>A</option><option>B</option><option>C</option><option>D</option></select></label></div>}
+      {form.question_type !== 'recall' && <><div className="form-grid"><label>选项 A<input value={form.option_a ?? ''} onChange={event => set('option_a', event.target.value)} required /></label><label>选项 B<input value={form.option_b ?? ''} onChange={event => set('option_b', event.target.value)} required /></label><label>选项 C<input value={form.option_c ?? ''} onChange={event => set('option_c', event.target.value)} required /></label><label>选项 D<input value={form.option_d ?? ''} onChange={event => set('option_d', event.target.value)} required /></label><label>选项 E（可不填）<input value={form.option_e ?? ''} onChange={event => set('option_e', event.target.value)} /></label></div>{form.question_type === 'choice' ? <label>正确选项<select value={form.correct_option ?? 'A'} onChange={event => set('correct_option', event.target.value as OptionKey)}><option>A</option><option>B</option><option>C</option><option>D</option><option value="E" disabled={!form.option_e}>E</option></select></label> : <fieldset className="correct-options"><legend>正确选项（可同时勾选 1-5 个）</legend>{(['A', 'B', 'C', 'D', 'E'] as OptionKey[]).map(key => <label key={key}><input type="checkbox" checked={form.correct_options.includes(key)} disabled={key === 'E' && !form.option_e} onChange={() => toggleCorrectOption(key)} /> {key}</label>)}</fieldset>}</>}
       <label>正确答案<textarea value={form.answer} onChange={event => set('answer', event.target.value)} placeholder="例如：东方红一号" required /></label>
       <label>答案解析<textarea value={form.explanation} onChange={event => set('explanation', event.target.value)} placeholder="写给学习者看的解释，帮助记忆。" required /></label>
       <section className="quick-images"><h2>配漫画（可不传）</h2><p>直接从电脑选择图片即可。原图最大 2 MB，系统会自动压缩至约 100 KB 并绑定到这一题。</p><div className="form-grid"><label>题目展示的漫画<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => setQuestionImage(event.target.files?.[0])} /></label><label>查看答案后展示的漫画<input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => setAnswerImage(event.target.files?.[0])} /></label></div></section>

@@ -1,2 +1,3 @@
-category_slug,topic_slug,slug,status,question_type,question,option_a,option_b,option_c,option_d,correct_option,answer,explanation,mnemonic,mistake_tip,difficulty,is_free,sort_order,question_image_filename,answer_image_filename
-science,space,dongfanghong-1,published,choice,我国第一颗人造地球卫星叫什么？,风云一号,东方红一号,嫦娥一号,神舟一号,B,东方红一号,1970年4月24日我国成功发射东方红一号。,,嫦娥一号是月球探测卫星。 ,1,true,1,dongfanghong-1-question.png,dongfanghong-1-answer.png
+category_slug,topic_slug,slug,status,question_type,question,option_a,option_b,option_c,option_d,option_e,correct_option,correct_options,answer,explanation,mnemonic,mistake_tip,difficulty,is_free,sort_order,question_image_filename,answer_image_filename
+science,space,dongfanghong-1,published,choice,我国第一颗人造地球卫星叫什么？,东方红一号,北斗一号,天宫一号,神舟一号,,A,,东方红一号,东方红一号是中国第一颗人造地球卫星。,东方红一号,不要混淆北斗导航系统,1,true,1,dongfanghong-1-question.png,dongfanghong-1-answer.png
+science,space,space-multiple-demo,draft,multiple,下列哪些属于中国航天成就？,东方红一号,北斗导航系统,天宫空间站,嫦娥探月工程,火星探测任务,,A|B|C|D|E,以上均为中国航天成就。,多选题可填写任意 1-5 个正确选项，多个字母用竖线分隔。,中国航天,只填字母，例如 A|C|E,2,true,2,,
