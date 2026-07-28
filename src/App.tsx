@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { HashRouter, Link, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, ChevronRight, Download, Heart, RotateCcw, Search, Settings2, Star, Upload, X } from 'lucide-react';
-import { cards, categories, replaceCards } from './data/cards';
+import { cards, categories, mergeCards, replaceCards } from './data/cards';
 import { CardArt } from './components/CardArt';
 import { EmptyState } from './components/EmptyState';
 import { Page } from './components/Layout';
@@ -13,7 +13,7 @@ import type { Rating, ReviewRecord, StudySession, UserSettings } from './types/r
 import { AuthForm, AccountPage } from './features/auth/AuthPages';
 import { useAuth } from './features/auth/useAuth';
 import { AdminGuard, AdminHome, ImportPage, PlaceholderAdmin, StoragePage, UsagePage } from './features/admin/AdminPages';
-import { fetchAllPublishedCards } from './features/cards/cardRepository';
+import { fetchAllPublishedCards, fetchPublishedCards } from './features/cards/cardRepository';
 import { mergeLocalData } from './features/progress/progressRepository';
 import { isSupabaseConfigured } from './lib/supabase/client';
 
@@ -66,7 +66,39 @@ function Study({store}:{store:ReturnType<typeof useStore>}) {
   return <Page><div className="study-layout"><aside className="study-aside"><p className="eyebrow">今日任务</p><h2>{learningLabel}</h2><div className="ratio"><b>{progressValue}</b> / {queue.length}<Progress value={progressValue} max={queue.length}/></div><p>{phase==='learn'?'第一步：先学完本轮知识点':phase==='quiz'?'第二步：只测刚学过的题':'第三步：记录掌握程度'}</p><Link to="/settings">学习设置 <Settings2 size={15}/></Link></aside><article className="study-card"><div className="card-top"><span className={`badge ${card.category}`}>{card.category} · {card.topic}</span><button aria-label="收藏此知识点" className={record.favorite?'fav active':'fav'} onClick={()=>toggleFavorite(card.id,records,setRecords)}><Heart size={20} fill={record.favorite?'currentColor':'none'}/></button></div>{phase==='learn'&&<><p className="study-step">{reviewMode?'复习前快速回顾':'第一步 · 漫画学习'}</p><h1>{card.answer}</h1><CardArt category={card.category} image={card.image}/><div className="answer-panel learn-panel"><p><b>知识讲解</b>{card.mnemonic ?? `先结合漫画记住：${card.answer}`}</p>{card.mistakeTip&&<p><b>易错提醒</b>{card.mistakeTip}</p>}</div><div className="actions study-actions"><button className="btn ghost" onClick={previousLearningCard} disabled={index===0}><ArrowLeft size={17}/>上一个知识点</button><button className="btn primary" onClick={nextLearningCard}>{index+1===queue.length?'学完了，进入本轮测验':'下一个知识点'} <ArrowRight size={17}/></button><button className="btn ghost" onClick={goToQuiz}>直接进入测验</button></div></>}{phase==='quiz'&&<><p className="study-step">第二步 · 本轮测验（只考刚学过的知识点）</p><h1>{card.question}</h1><CardArt category={card.category} image={card.image}/>{hasOptions?<section className="answer-choices study-quiz"><p>{isMultiple?'多选题：请勾选所有正确答案。':'单选题：请选择一个答案。'}</p><div className="answer-options">{card.options?.map(option=><label key={option.key} className={selected.includes(option.key)?'selected':''}><input type={isMultiple?'checkbox':'radio'} name="study-answer" checked={selected.includes(option.key)} onChange={()=>choose(option.key)}/><b>{option.key}</b><span>{option.value}</span></label>)}</div><button className="btn primary" disabled={!selected.length} onClick={showResult}>确认答案</button></section>:<section className="answer-choices study-quiz recall-prompt"><p>这是一道问答题，请先在心里作答，再查看参考答案。</p><button className="btn primary" onClick={showResult}>查看答案</button></section>}</>}{phase==='result'&&<><p className="study-step">第三步 · 看答案漫画，再决定掌握程度</p><h1>{hasOptions?(correct?'回答正确，继续巩固记忆。':'答案不正确，再看一次漫画与解析。'):'参考答案与解析'}</h1><div className="study-result-art"><CardArt category={card.category} image={card.answerImage??card.image}/><small>{card.answerImage?'答案漫画':'题干漫画（尚未上传答案漫画）'}</small></div><div className="answer-panel"><p><b>标准答案</b>{card.answer}</p>{card.mistakeTip&&<p><b>易错提醒</b>{card.mistakeTip}</p>}<p><b>答题解析</b>{card.explanation}</p></div><div className="rating"><button onClick={()=>rate('forgot')}><X/>忘了<small>10 分钟后再来</small></button><button onClick={()=>rate('fuzzy')}><RotateCcw/>有点模糊<small>明天再复习</small></button><button onClick={()=>rate('remembered')}><Check/>记住了<small>间隔复习</small></button></div></>}{settings.showShortcutHint&&<small className="hint">快捷键：学习页按空格进入测验 · F 收藏</small>}</article></div></Page>;
 }
 
-function Library({store}:{store:ReturnType<typeof useStore>}) { const {records}=store; const [params,setParams]=useSearchParams(); const [query,setQuery]=useState(''); const cat=params.get('category') ?? '全部'; const status=params.get('status') ?? '全部'; const result=cards.filter(c=>(cat==='全部'||c.category===cat)&&(status==='全部'||(status==='已掌握'?records[c.id]?.status==='mastered':status==='未学习'?!records[c.id]:!!records[c.id]))&&[c.question,c.answer,c.topic,...c.tags].join('').includes(query)); return <Page><section className="page-intro"><div><p className="eyebrow">题库</p><h1>把零散考点，收进脑海</h1></div><label className="search"><Search size={17}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索知识点、标签"/></label></section><div className="filters">{categories.map(x=><button className={cat===x?'selected':''} onClick={()=>setParams(x==='全部'?{}:{category:x})} key={x}>{x}</button>)}<span/>{['全部','未学习','学习中','已掌握'].map(x=><button className={status===x?'selected':''} onClick={()=>setParams(Object.fromEntries([['category',cat],['status',x]].filter(([,v])=>v!=='全部')))} key={x}>{x}</button>)}</div><div className="library-list">{result.map(card=><LibraryItem card={card} record={records[card.id]}/>)}</div>{!result.length&&<EmptyState title="没有找到对应知识点" description="换一个关键词或筛选条件试试看。"/>}</Page>; }
+function Library({store}:{store:ReturnType<typeof useStore>}) {
+  const {records}=store;
+  const [params,setParams]=useSearchParams();
+  const [query,setQuery]=useState('');
+  const deferredQuery=useDeferredValue(query.trim());
+  const [pageSize,setPageSize]=useState(20);
+  const [cloud,setCloud]=useState({cards:[] as KnowledgeCard[],count:0,loading:false,error:false});
+  const cat=params.get('category') ?? '全部';
+  const status=params.get('status') ?? '全部';
+  const page=Math.max(1,Number(params.get('page'))||1);
+  const localResult=useMemo(()=>cards.filter(c=>(cat==='全部'||c.category===cat)&&[c.question,c.answer,c.topic,...c.tags].join('').includes(deferredQuery)),[cat,deferredQuery]);
+  const usingCloud=isSupabaseConfigured;
+  useEffect(()=>{
+    if(!usingCloud)return;
+    let cancelled=false;
+    setCloud(current=>({...current,loading:true,error:false}));
+    fetchPublishedCards(page-1,pageSize,{query:deferredQuery,category:cat}).then(result=>{
+      if(!cancelled){mergeCards(result.cards);setCloud({cards:result.cards,count:result.count,loading:false,error:false});}
+    }).catch(()=>{if(!cancelled)setCloud(current=>({...current,loading:false,error:true}));});
+    return()=>{cancelled=true;};
+  },[usingCloud,page,pageSize,cat,deferredQuery]);
+  const statusMatch=(card:KnowledgeCard)=>status==='全部'||(status==='已掌握'?records[card.id]?.status==='mastered':status==='未学习'?!records[card.id]:Boolean(records[card.id]));
+  const source=usingCloud?cloud.cards:localResult;
+  const result=(usingCloud?source:source.slice((page-1)*pageSize,page*pageSize)).filter(statusMatch);
+  const total=usingCloud?cloud.count:localResult.length;
+  const pageCount=Math.max(1,Math.ceil(total/pageSize));
+  const from=total?(page-1)*pageSize+1:0;
+  const to=Math.min(total,page*pageSize);
+  const setPage=(next:number)=>{const nextParams=new URLSearchParams(params);if(next<=1)nextParams.delete('page');else nextParams.set('page',String(Math.min(pageCount,Math.max(1,next))));setParams(nextParams);window.scrollTo({top:0,behavior:'smooth'});};
+  const setFilter=(key:'category'|'status',value:string)=>{const nextParams=new URLSearchParams(params);if(value==='全部')nextParams.delete(key);else nextParams.set(key,value);nextParams.delete('page');setParams(nextParams);};
+  const pageItems=useMemo(()=>{const values=new Set([1,2,page-1,page,page+1,pageCount-1,pageCount]);return [...values].filter(value=>value>=1&&value<=pageCount).sort((a,b)=>a-b).reduce<Array<number|'gap'>>((items,value,index,values)=>{if(index&&value-values[index-1]>1)items.push('gap');items.push(value);return items;},[]);},[page,pageCount]);
+  return <Page><section className="page-intro library-intro"><div><p className="eyebrow">题库</p><h1>把零散考点，收进脑海</h1><p>按分类和状态快速定位；题目再多也只显示一页。</p></div><label className="search"><Search size={17}/><input value={query} onChange={e=>{setQuery(e.target.value);if(page!==1)setPage(1);}} placeholder="搜索题干、答案、专题"/></label></section><div className="filters library-filters"><div className="filter-group"><small>分类</small>{categories.map(x=><button className={cat===x?'selected':''} onClick={()=>setFilter('category',x)} key={x}>{x}</button>)}</div><div className="filter-group status-filter"><small>进度</small>{['全部','未学习','学习中','已掌握'].map(x=><button className={status===x?'selected':''} onClick={()=>setFilter('status',x)} key={x}>{x}</button>)}</div></div><section className="library-toolbar"><p><b>{total.toLocaleString()}</b> 道题目 <span>·</span> 当前显示 {from}–{to}</p><label>每页<select value={pageSize} onChange={e=>{setPageSize(Number(e.target.value));if(page!==1)setPage(1);}}><option value="20">20 题</option><option value="40">40 题</option><option value="60">60 题</option></select></label></section>{cloud.loading&&<div className="library-loading">正在加载这一页题目…</div>}{cloud.error&&<div className="library-loading error">题库加载失败，已保留当前内容，请稍后重试。</div>}<div className="library-list">{result.map(card=><LibraryItem key={card.id} card={card} record={records[card.id]}/>)}</div>{!cloud.loading&&!result.length&&<EmptyState title="没有找到对应知识点" description="换一个关键词或筛选条件试试看。"/>}{total>pageSize&&<nav className="pagination" aria-label="题库分页"><button onClick={()=>setPage(page-1)} disabled={page===1}>上一页</button>{pageItems.map((item,index)=>item==='gap'?<span key={`gap-${index}`}>…</span>:<button key={item} className={item===page?'active':''} onClick={()=>setPage(item)} aria-current={item===page?'page':undefined}>{item}</button>)}<button onClick={()=>setPage(page+1)} disabled={page===pageCount}>下一页</button><label>跳至<input type="number" min="1" max={pageCount} defaultValue={page} key={page} onKeyDown={event=>{if(event.key==='Enter')setPage(Number(event.currentTarget.value));}}/> 页</label></nav>}</Page>;
+}
 function LibraryItem({card,record}:{card:KnowledgeCard;record?:ReviewRecord}) { return <Link className="library-item" to={`/card/${card.id}`}><CardArt category={card.category} compact image={card.image}/><div><span className={`badge ${card.category}`}>{card.category}</span><h3>{card.question}</h3><p>{card.topic} · {card.tags.join(' · ')}</p></div><aside><b>{statusText(record)}</b><small>{record?.nextReviewAt?`下次复习：${formatDate(record.nextReviewAt)}`:'点击学习'}</small></aside></Link>; }
 
 function Detail({store}:{store:ReturnType<typeof useStore>}) {
