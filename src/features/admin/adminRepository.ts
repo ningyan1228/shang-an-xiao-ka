@@ -19,6 +19,26 @@ export async function getAdminCards() { const { data, error } = await client().f
 export async function getAdminCard(id: string) { const { data, error } = await client().from('knowledge_cards').select('id,topic_id,slug,status,question_type,question,answer,explanation,mnemonic,mistake_tip,option_a,option_b,option_c,option_d,option_e,correct_option,correct_options,difficulty,is_free,sort_order,question_image_path,answer_image_path,question_thumbnail_path,answer_thumbnail_path,image_alt,topics(name,categories(name))').eq('id', id).maybeSingle(); if (error) throw new Error(supabaseErrorMessage(error)); return data ? mapCard(data) : null; }
 export async function saveCard(input: CardInput, id?: string) { const db = client(); const { question_image_path: _questionImagePath, answer_image_path: _answerImagePath, question_thumbnail_path: _questionThumbnailPath, answer_thumbnail_path: _answerThumbnailPath, ...editableInput } = input; const correct_options = input.question_type === 'multiple' ? input.correct_options : input.question_type === 'choice' && input.correct_option ? [input.correct_option] : []; const payload = { ...editableInput, correct_option: input.question_type === 'choice' ? input.correct_option : null, correct_options, published_at: input.status === 'published' ? new Date().toISOString() : null }; const result = id ? await db.from('knowledge_cards').update(payload).eq('id', id).select('id').single() : await db.from('knowledge_cards').insert(payload).select('id').single(); if (result.error) throw new Error(supabaseErrorMessage(result.error)); return result.data.id as string; }export async function updateCardStatus(id: string, status: AdminCard['status']) { const { error } = await client().from('knowledge_cards').update({ status, published_at: status === 'published' ? new Date().toISOString() : null }).eq('id', id); if (error) throw new Error(supabaseErrorMessage(error)); }
 export async function saveTopic(input: TopicInput, id?: string) { const db = client(); const result = id ? await db.from('topics').update(input).eq('id', id) : await db.from('topics').insert(input); if (result.error?.code === '23505') throw new Error(`专题 slug「${input.slug}」已存在，请换一个。`); if (result.error) throw new Error(supabaseErrorMessage(result.error)); }
+export type ImportTopicInput = { category_slug: string; topic_slug: string; name: string };
+export async function createImportTopics(inputs: ImportTopicInput[], categories: AdminCategory[], topics: AdminTopic[]) {
+  const categoryIndex = new Map(categories.map(category => [category.slug, category]));
+  const existingSlugs = new Set(topics.map(topic => topic.slug));
+  const sortOrderByCategory = new Map<string, number>();
+  topics.forEach(topic => sortOrderByCategory.set(topic.category_id, Math.max(sortOrderByCategory.get(topic.category_id) ?? -1, topic.sort_order)));
+  const payload = inputs
+    .filter(input => !existingSlugs.has(input.topic_slug))
+    .map(input => {
+      const category = categoryIndex.get(input.category_slug);
+      if (!category) throw new Error(`分类 slug「${input.category_slug}」不存在，无法创建专题「${input.topic_slug}」。`);
+      const sort_order = (sortOrderByCategory.get(category.id) ?? -1) + 1;
+      sortOrderByCategory.set(category.id, sort_order);
+      return { category_id: category.id, name: input.name, slug: input.topic_slug, description: '由 CSV 批量导入时自动创建。', sort_order, is_free: true, is_active: true };
+    });
+  if (!payload.length) return 0;
+  const { error } = await client().from('topics').insert(payload);
+  if (error) throw new Error(supabaseErrorMessage(error));
+  return payload.length;
+}
 export async function swapTopicOrder(first: AdminTopic, second: AdminTopic) { const db = client(); const [a, b] = await Promise.all([db.from('topics').update({ sort_order: second.sort_order }).eq('id', first.id), db.from('topics').update({ sort_order: first.sort_order }).eq('id', second.id)]); if (a.error) throw new Error(supabaseErrorMessage(a.error)); if (b.error) throw new Error(supabaseErrorMessage(b.error)); }
 export async function uploadCardImage(path: string, file: File) { const { error } = await client().storage.from('card-images').upload(path, file, { upsert: false, cacheControl: '31536000', contentType: 'image/webp' }); if (error) throw new Error(supabaseErrorMessage(error)); return path; }
 export async function bindCardImages(slug: string, kind: 'question' | 'answer', fullPath: string, thumbnailPath: string) { const payload = kind === 'question' ? { question_image_path: fullPath, question_thumbnail_path: thumbnailPath } : { answer_image_path: fullPath, answer_thumbnail_path: thumbnailPath }; const { data, error } = await client().from('knowledge_cards').update(payload).eq('slug', slug).select('id').maybeSingle(); if (error) throw new Error(supabaseErrorMessage(error)); if (!data) throw new Error(`未找到 slug 为「${slug}」的知识点，图片未绑定。`); }

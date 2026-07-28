@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '../../components/EmptyState';
-import { bindCardImages, getAdminCard, getAdminCards, getAdminCategories, getAdminTopics, type AdminCard, type AdminCategory, type AdminTopic, type CardInput, type OptionKey, type TopicInput, estimateUsage, importCards, saveCard, saveTopic, swapTopicOrder, updateCardStatus, uploadCardImage } from './adminRepository';
+import { bindCardImages, createImportTopics, getAdminCard, getAdminCards, getAdminCategories, getAdminTopics, type AdminCard, type AdminCategory, type AdminTopic, type CardInput, type OptionKey, type TopicInput, estimateUsage, importCards, saveCard, saveTopic, swapTopicOrder, updateCardStatus, uploadCardImage } from './adminRepository';
 import { matchImageFilename, parseCsv, type ImportRow } from './csv';
+import { getImportTopicName } from './importTopicNames';
 import { prepareCardImages } from '../../lib/images/compressImage';
 import { CardImageUploader } from './CardImageUploader';
 import { QuickCardPage } from './QuickCardPage';
@@ -61,7 +62,65 @@ export function TopicsPage() {
   return <section className="admin-page"><Link to="/admin">← 返回后台</Link><h1>专题管理</h1><form className="admin-form compact-form" onSubmit={submit}><h2>{editing ? '编辑专题' : '新建专题'}</h2><div className="form-grid"><label>所属分类<select value={form.category_id} onChange={event => setForm(current => ({ ...current, category_id: event.target.value }))} required>{categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label>专题名称<input value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} required /></label><label>专题 slug（用于 CSV 导入）<input value={form.slug} onChange={event => setForm(current => ({ ...current, slug: normalizeTopicSlug(event.target.value) }))} placeholder="例如 beijing-central-axis" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required /><small className="admin-muted">只能填小写字母、数字和连字符；CSV 的 topic_slug 要与这里完全一致。</small></label><label>排序<input type="number" value={form.sort_order} onChange={event => setForm(current => ({ ...current, sort_order: Number(event.target.value) }))} /></label></div><label>说明<textarea value={form.description ?? ''} onChange={event => setForm(current => ({ ...current, description: event.target.value || null }))} /></label><div className="inline-controls"><label><input type="checkbox" checked={form.is_free} onChange={event => setForm(current => ({ ...current, is_free: event.target.checked }))} /> 免费</label><label><input type="checkbox" checked={form.is_active} onChange={event => setForm(current => ({ ...current, is_active: event.target.checked }))} /> 启用</label><button className="btn primary" disabled={busy}>{busy ? '正在保存…' : editing ? '保存专题' : '创建专题'}</button>{editing && <button type="button" className="btn ghost" onClick={() => { setEditing(null); setForm(blankTopic(categories[0]?.id ?? '')); }}>取消编辑</button>}</div></form>{message && <p className="form-message">{message}</p>}<div className="table-wrap"><table><thead><tr><th>分类</th><th>专题</th><th>slug</th><th>状态</th><th>排序</th><th>操作</th></tr></thead><tbody>{topics.map(topic => <tr key={topic.id}><td>{topic.category_name}</td><td>{topic.name}</td><td>{topic.slug}</td><td>{topic.is_active ? '启用' : '停用'}</td><td>{topic.sort_order}</td><td className="topic-actions"><button onClick={() => move(topic, -1)}>↑</button><button onClick={() => move(topic, 1)}>↓</button><button onClick={() => edit(topic)}>编辑</button></td></tr>)}</tbody></table></div></section>;
 }
 
-export function ImportPage() { const [rows, setRows] = useState<ImportRow[]>([]); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false); const upload = (file?: File) => { if (!file) return; const reader = new FileReader(); reader.onload = () => setRows(parseCsv(String(reader.result))); reader.readAsText(file, 'utf-8'); }; const save = async () => { setBusy(true); try { const topics = await getAdminTopics(); await importCards(rows.filter(row => !row.error), topics); setMessage(`已提交 ${rows.filter(row => !row.error).length} 条知识点。`); } catch (error) { setMessage(error instanceof Error ? error.message : '导入失败。'); } finally { setBusy(false); } }; return <section className="admin-page"><Link to="/admin">← 返回后台</Link><h1>CSV 批量导入</h1><p>请使用中文 Excel 模板填写，保存为 CSV UTF-8 后上传。每批最多 50 条。</p><a className="btn ghost" href="./templates/上岸小卡-题库导入模板-多选版.xlsx" download>下载中文 Excel 模板（支持多选 / 选项 E）</a><input type="file" accept=".csv,text/csv" onChange={event => upload(event.target.files?.[0])} />{rows.length > 0 && <><div className="import-summary">共 {rows.length} 行，可导入 {rows.filter(row => !row.error).length} 行，错误 {rows.filter(row => row.error).length} 行。</div><div className="table-wrap"><table><thead><tr><th>行</th><th>slug</th><th>题目</th><th>检查</th></tr></thead><tbody>{rows.slice(0, 100).map(row => <tr key={row.line}><td>{row.line}</td><td>{row.slug}</td><td>{row.question}</td><td>{row.error ?? '可导入'}</td></tr>)}</tbody></table></div><button className="btn primary" disabled={busy || !rows.some(row => !row.error)} onClick={save}>{busy ? '正在导入…' : '确认导入'}</button></>}{message && <p className="form-message">{message}</p>}</section>; }
+export function ImportPage() {
+  const [rows, setRows] = useState<ImportRow[]>([]);
+  const [categories, setCategories] = useState<AdminCategory[]>([]);
+  const [topics, setTopics] = useState<AdminTopic[]>([]);
+  const [message, setMessage] = useState('');
+  const [busy, setBusy] = useState(false);
+  const validRows = rows.filter(row => !row.error);
+  const requiredTopics = Array.from(new Map(validRows.map(row => [`${row.category_slug}:${row.topic_slug}`, { category_slug: row.category_slug, topic_slug: row.topic_slug, name: getImportTopicName(row.topic_slug) }])).values());
+  const missingTopics = requiredTopics.filter(required => !topics.some(topic => topic.slug === required.topic_slug));
+  const unknownCategories = missingTopics.filter(required => !categories.some(category => category.slug === required.category_slug));
+  const loadMetadata = async (): Promise<AdminTopic[]> => {
+    const [categoryList, topicList] = await Promise.all([getAdminCategories(), getAdminTopics()]);
+    setCategories(categoryList);
+    setTopics(topicList);
+    return topicList;
+  };
+  const upload = (file?: File) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setRows(parseCsv(String(reader.result)));
+      setMessage('');
+      void loadMetadata().catch(error => setMessage(error instanceof Error ? error.message : '无法读取现有专题。'));
+    };
+    reader.readAsText(file, 'utf-8');
+  };
+  const createMissingTopics = async () => {
+    if (!missingTopics.length) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      const created = await createImportTopics(missingTopics, categories, topics);
+      await loadMetadata();
+      setMessage(`已创建 ${created} 个缺失专题；现在可以确认导入。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '专题创建失败。');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const save = async () => {
+    setBusy(true);
+    setMessage('');
+    try {
+      const latestTopics = await loadMetadata();
+      const stillMissing = requiredTopics.filter(required => !latestTopics.some(topic => topic.slug === required.topic_slug));
+      if (stillMissing.length) {
+        throw new Error(`仍缺少 ${stillMissing.length} 个专题，请先点击“创建缺失专题”。`);
+      }
+      await importCards(validRows, latestTopics);
+      setMessage(`已提交 ${validRows.length} 条知识点。`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : '导入失败。');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <section className="admin-page"><Link to="/admin">← 返回后台</Link><h1>CSV 批量导入</h1><p>请使用中文 Excel 模板填写，保存为 CSV UTF-8 后上传。超过 50 条会自动分批导入。</p><a className="btn ghost" href="./templates/上岸小卡-题库导入模板-多选版.xlsx" download>下载中文 Excel 模板（支持多选 / 选项 E）</a><input type="file" accept=".csv,text/csv" onChange={event => upload(event.target.files?.[0])} />{rows.length > 0 && <><div className="import-summary">共 {rows.length} 道题，可导入 {validRows.length} 道，错误 {rows.filter(row => row.error).length} 道。</div>{missingTopics.length > 0 && <div className="form-message"><b>检测到 {missingTopics.length} 个缺失专题。</b><br />{missingTopics.map(topic => `${topic.name}（${topic.topic_slug}）`).join('、')}{unknownCategories.length > 0 ? <p>以下分类不存在，无法自动创建：{unknownCategories.map(topic => topic.category_slug).join('、')}。</p> : <button className="btn primary" disabled={busy} onClick={createMissingTopics}>{busy ? '正在创建专题…' : `创建 ${missingTopics.length} 个缺失专题`}</button>}</div>}<p className="admin-muted">下方仅预览前 {Math.min(rows.length, 100)} 道题；全部 {validRows.length} 道都会在确认后导入。</p><div className="table-wrap"><table><thead><tr><th>题号</th><th>slug</th><th>题目</th><th>检查</th></tr></thead><tbody>{rows.slice(0, 100).map((row, index) => <tr key={row.line}><td>{index + 1}</td><td>{row.slug}</td><td>{row.question}</td><td>{row.error ?? '可导入'}</td></tr>)}</tbody></table></div><button className="btn primary" disabled={busy || !validRows.length || missingTopics.length > 0} onClick={save}>{busy ? '正在导入…' : '确认导入'}</button></>}{message && <p className="form-message">{message}</p>}</section>;
+}
 
 export function StoragePage() { const [files, setFiles] = useState<File[]>([]); const [message, setMessage] = useState(''); const [busy, setBusy] = useState(false); const upload = async () => { setBusy(true); const failed: string[] = []; let bound = 0; try { for (const file of files) { const parsed = matchImageFilename(file.name); if (!parsed) { failed.push(`${file.name}（文件名不符合规则）`); continue; } try { const images = await prepareCardImages(file); const base = `cards/${parsed.slug}/${parsed.kind}-${Date.now()}`; const fullPath = await uploadCardImage(`${base}.webp`, images.full.file); const thumbnailPath = await uploadCardImage(`${base}-thumb.webp`, images.thumbnail.file); await bindCardImages(parsed.slug, parsed.kind, fullPath, thumbnailPath); bound += 1; } catch (error) { failed.push(`${file.name}（${error instanceof Error ? error.message : '上传失败'}）`); } } setMessage(`已自动上传并绑定 ${bound} 张漫画。${failed.length ? `未完成：${failed.join('；')}` : ''}`); } finally { setBusy(false); } }; return <section className="admin-page"><Link to="/admin">← 返回后台</Link><h1>批量漫画匹配</h1><p>先创建知识点，再按 <code>题目slug-question.png</code> 或 <code>题目slug-answer.png</code> 命名图片。上传后会自动压缩至约 100 KB、上传并写回对应题目（原图最大 2 MB）。</p><input type="file" accept="image/png,image/jpeg,image/webp" multiple onChange={event => setFiles(event.target.files ? Array.from(event.target.files) : [])} />{files.length > 0 && <ul>{files.map(file => { const parsed = matchImageFilename(file.name); return <li key={file.name}>{file.name}：{parsed ? `将绑定到 ${parsed.slug}（${parsed.kind === 'question' ? '题干漫画' : '答案漫画'}）` : '文件名不符合规则，将跳过'}</li>; })}</ul>}<button className="btn primary" disabled={busy || !files.length} onClick={upload}>{busy ? '正在压缩、上传并绑定…' : '确认上传并自动绑定'}</button>{message && <p className="form-message">{message}</p>}</section>; }
 
