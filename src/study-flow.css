@@ -1,6 +1,7 @@
 .study-step{margin:15px 0 -4px;color:#4c8054;font-size:14px;font-weight:700}
 .learn-panel{margin-top:18px}
 .study-actions{max-width:550px;margin:18px auto 4px;justify-content:center}
+.study-actions button:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
 .study-quiz{max-width:650px;margin:20px auto 0;text-align:left}
 .study-result-art{max-width:620px;margin:0 auto 14px}
 .study-result-art .card-art{width:100%;height:300px}
