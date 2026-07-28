@@ -27,4 +27,5 @@ const items: Array<Omit<KnowledgeCard, 'id'>> = [
 ];
 export let cards: KnowledgeCard[] = items.map((item, index) => ({ ...item, id: `card-${index + 1}` }));
 export function replaceCards(nextCards: KnowledgeCard[]) { if (nextCards.length) cards = nextCards; }
+export function mergeCards(nextCards: KnowledgeCard[]) { if (nextCards.length) { const incoming=new Set(nextCards.map(card=>card.id)); cards=[...nextCards,...cards.filter(card=>!incoming.has(card.id))]; } }
 export const categories = ['全部','法律','历史','人文','科技','地理','经济','政治','趣味'] as const;
