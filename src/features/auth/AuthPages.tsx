@@ -4,6 +4,7 @@ import type { User } from '@supabase/supabase-js';
 import { signIn, signOut, signUp } from './authRepository';
 import { loadRecords, loadSessions } from '../../lib/storage';
 import { Page } from '../../components/Layout';
+import '../../styles/membership.css';
 
 export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const [email, setEmail] = useState('');
@@ -46,12 +47,15 @@ export function AuthForm({ mode }: { mode: 'login' | 'register' }) {
 export function AccountPage({ user, role, onMerge }: { user: User | null; role: 'user' | 'admin' | null; onMerge: () => Promise<void> }) {
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  if (!user) return <Page><section className="auth-page"><div className="auth-card"><h1>尚未登录</h1><p>游客模式仍可使用全部基础学习功能。</p><Link className="btn primary" to="/login">登录同步</Link></div></section></Page>;
+  const showMembershipNotice = () => alert('会员功能正在准备中。当前核心学习、复习、错题和数据功能均可免费使用。');
+  const membershipEntry = <section className="membership-card"><b>会员服务</b><p>会员功能正在准备中；当前基础学习功能均可免费使用。</p><button className="text-button" onClick={showMembershipNotice}>了解会员</button></section>;
+  if (!user) return <Page><section className="auth-page"><div className="auth-card"><h1>尚未登录</h1><p>游客模式仍可使用全部基础学习功能。</p><Link className="btn primary" to="/login">登录同步</Link>{membershipEntry}</div></section></Page>;
   const localCount = Object.keys(loadRecords()).length;
   const localSessions = loadSessions().length;
   return <Page><section className="auth-page"><div className="auth-card">
     <p className="eyebrow">我的账户</p><h1>{user.user_metadata.display_name || user.email}</h1><p>{user.email}</p><p>角色：{role === 'admin' ? '管理员' : '普通用户'}</p>
     <div className="actions account-actions"><Link className="btn primary" to="/study">开始今日学习</Link><Link className="btn ghost" to="/library">浏览题库</Link></div>
+    {membershipEntry}
     {localCount > 0 && <div className="merge-box"><b>检测到本机学习记录</b><p>本地已学习 {localCount} 个知识点，{localSessions} 次学习总结。</p><button className="btn primary" disabled={busy} onClick={async () => { setBusy(true); try { await onMerge(); setMessage('本地记录已合并到云端，本地备份仍然保留。'); } catch (error) { setMessage(error instanceof Error ? error.message : '合并失败，本地记录未删除。'); } finally { setBusy(false); } }}>合并到云端</button></div>}
     {role === 'admin' && <Link to="/admin" className="btn ghost">进入管理员后台</Link>}
     <button className="btn ghost" onClick={async () => { try { await signOut(); setMessage('已退出登录。'); } catch (error) { setMessage(error instanceof Error ? error.message : '退出失败。'); } }}>退出登录</button>

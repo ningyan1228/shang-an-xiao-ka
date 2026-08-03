@@ -1,0 +1,34 @@
+/* Membership is intentionally a quiet account-page option, not a global call to action. */
+.membership-card {
+  margin: 18px 0 0;
+  padding: 14px 0 0;
+  border-top: 1px solid #eee1cf;
+  color: #71675c;
+  font-size: 13px;
+}
+
+.membership-card b {
+  color: #51473c;
+  font-size: 14px;
+}
+
+.membership-card p { margin: 5px 0; }
+
+.text-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #477a4d;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.text-button:hover { text-decoration: underline; }
+
+html[data-theme="dark"] .membership-card {
+  border-color: #4a6652;
+  color: #c9d4c5;
+}
+
+html[data-theme="dark"] .membership-card b { color: #f6efdf; }
+html[data-theme="dark"] .text-button { color: #9bd39f; }
