@@ -7,6 +7,9 @@ import { getImportTopicName } from './importTopicNames';
 import { prepareCardImages } from '../../lib/images/compressImage';
 import { CardImageUploader } from './CardImageUploader';
 import { QuickCardPage } from './QuickCardPage';
+import { CardsWorkspace } from './CardsWorkspace';
+import { CardEditorWorkspace } from './CardEditorWorkspace';
+import '../../styles/admin-workspace.css';
 
 const blankCard = (topicId = ''): CardInput => ({ topic_id: topicId, slug: `card-${Date.now()}`, status: 'draft', question_type: 'choice', question: '', answer: '', explanation: '', mnemonic: null, mistake_tip: null, option_a: '', option_b: '', option_c: '', option_d: '', option_e: '', correct_option: 'A', correct_options: ['A'], difficulty: 1, is_free: true, sort_order: 0, image_alt: null });
 const blankTopic = (categoryId = ''): TopicInput => ({ category_id: categoryId, name: '', slug: '', description: null, sort_order: 0, is_free: true, is_active: true });
@@ -127,9 +130,9 @@ export function StoragePage() { const [files, setFiles] = useState<File[]>([]); 
 export function UsagePage() { const [usage, setUsage] = useState<{ cardCount: number; topicCount: number; imageCount: number; bytes: number; average: number } | null>(null); useEffect(() => { estimateUsage().then(setUsage).catch(() => setUsage(null)); }, []); const mb = (value: number) => (value / 1024 / 1024).toFixed(2); return <section className="admin-page"><Link to="/admin">← 返回后台</Link><h1>免费额度用量估算</h1>{usage ? <div className="usage"><p>知识点：<b>{usage.cardCount}</b></p><p>专题：<b>{usage.topicCount}</b></p><p>已读取图片文件：<b>{usage.imageCount}</b></p><p>图片总大小：<b>{mb(usage.bytes)} MB</b></p><p>平均每张：<b>{Math.round(usage.average / 1024)} KB</b></p><p>实际流量和数据库用量请以 Supabase Dashboard 为准。</p></div> : <p>正在读取内容统计，或云端尚未配置。</p>}</section>; }
 
 export function PlaceholderAdmin({ title }: { title: string }) {
-  if (title === '知识点管理') return <CardsPage />;
+  if (title === '知识点管理') return <CardsWorkspace />;
   if (title === '新建知识点') return <QuickCardPage />;
-  if (title === '编辑知识点') return <CardEditor />;
+  if (title === '编辑知识点') return <CardEditorWorkspace />;
   if (title === '专题管理') return <TopicsPage />;
   return <EmptyState title={title} description="该功能暂不可用。" />;
 }
